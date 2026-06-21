@@ -25,7 +25,11 @@ export default function EmissionsChart() {
     <div className="space-y-6">
       {/* Monthly Trend */}
       <div className="bg-card border border-border rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-6">Emissions Trend</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-6">Emissions Trend (kg CO₂e)</h3>
+        <p className="sr-only">
+          Your monthly emissions show a general downward trend from January (142 kg) to August (125 kg),
+          with slight variations between 138 and 151 kg throughout the period.
+        </p>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={monthlyData}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -58,6 +62,10 @@ export default function EmissionsChart() {
         {/* Pie Chart */}
         <div className="bg-card border border-border rounded-lg p-6">
           <h3 className="text-lg font-semibold text-foreground mb-6">Emissions by Category</h3>
+          <p className="sr-only">
+            Emissions breakdown: Transport 65%, Energy 35%, Food 18%, Other 7%.
+            Transport is your largest emission source at 65% of total emissions.
+          </p>
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
               <Pie
@@ -96,7 +104,7 @@ export default function EmissionsChart() {
                   <span className="text-foreground font-medium">{category.name}</span>
                   <span className="text-muted-foreground">{category.value}%</span>
                 </div>
-                <div className="w-full bg-secondary rounded-full h-2">
+                <div className="w-full bg-secondary rounded-full h-2" role="progressbar" aria-valuenow={category.value} aria-valuemin={0} aria-valuemax={100} aria-label={`${category.name}: ${category.value}% of emissions`}>
                   <div
                     className="h-2 rounded-full"
                     style={{

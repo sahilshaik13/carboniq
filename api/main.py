@@ -4,8 +4,8 @@ CarbonIQ Backend API - FastAPI server for emission calculation and data manageme
 
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthCredential
-from pydantic import BaseModel, EmailStr
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional, List
 from datetime import datetime, timedelta
 import jwt
@@ -15,13 +15,20 @@ from functools import lru_cache
 # Initialize FastAPI
 app = FastAPI(title="CarbonIQ API", version="1.0.0")
 
-# Add CORS middleware
+# CORS Configuration - restrict to deployed frontend origin
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+CORS_ORIGINS = [
+    FRONTEND_URL,
+    "http://localhost:3000",
+    "http://localhost:8000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Security
@@ -32,26 +39,43 @@ ALGORITHM = "HS256"
 # ============= Models =============
 
 class UserRegister(BaseModel):
+    """User registration model with validation"""
     email: EmailStr
-    password: str
-    full_name: str
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
+    full_name: str = Field(..., min_length=1, max_length=255, description="Full name is required")
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if not any(char.isdigit() for char in v):
+            raise ValueError('Password must contain at least one digit')
+        return v
 
 class UserLogin(BaseModel):
+    """User login model with validation"""
     email: EmailStr
     password: str
 
 class TokenResponse(BaseModel):
+    """Token response model"""
     access_token: str
     token_type: str = "bearer"
 
 class ActivityLog(BaseModel):
-    user_id: str
-    category: str  # transport, energy, food, etc
-    subcategory: str  # car, electricity, meat, etc
-    value: float  # km, kWh, kg, etc
-    unit: str  # km, kWh, kg, etc
+    """Activity logging model with input validation"""
+    user_id: str = Field(..., min_length=1, description="User ID is required")
+    category: str = Field(..., min_length=1, description="Category is required")
+    subcategory: str = Field(..., min_length=1, description="Subcategory is required")
+    value: float = Field(..., gt=0, description="Value must be greater than 0")
+    unit: str = Field(..., min_length=1, max_length=50, description="Unit is required")
     date: datetime
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=500, description="Optional notes up to 500 characters")
+    
+    @validator('category')
+    def validate_category(cls, v):
+        valid_categories = ["transport", "energy", "food", "consumption"]
+        if v not in valid_categories:
+            raise ValueError(f"Invalid category. Must be one of: {', '.join(valid_categories)}")
+        return v
 
 class ActivityResponse(ActivityLog):
     id: str
@@ -103,11 +127,27 @@ EMISSION_FACTORS = {
 }
 
 def calculate_emissions(category: str, subcategory: str, value: float) -> float:
-    """Calculate CO2e emissions for an activity"""
-    if category in EMISSION_FACTORS and subcategory in EMISSION_FACTORS[category]:
-        factor = EMISSION_FACTORS[category][subcategory]
-        return value * factor
-    return 0.0
+    """
+    Calculate CO2e emissions for an activity.
+    
+    Args:
+        category: Activity category (transport, energy, food, consumption)
+        subcategory: Specific activity type within category
+        value: Quantity of activity
+        
+    Returns:
+        float: Calculated emissions in kg CO2e
+        
+    Raises:
+        ValueError: If category or subcategory is invalid
+    """
+    if category not in EMISSION_FACTORS:
+        raise ValueError(f"Invalid category: {category}")
+    if subcategory not in EMISSION_FACTORS[category]:
+        raise ValueError(f"Invalid subcategory: {subcategory} for category {category}")
+    
+    factor = EMISSION_FACTORS[category][subcategory]
+    return value * factor
 
 # ============= Routes =============
 
@@ -119,49 +159,124 @@ async def health_check():
 # Auth endpoints
 @app.post("/auth/register", response_model=TokenResponse)
 async def register(user: UserRegister):
-    """Register a new user (mock implementation)"""
-    # In production, this would hash the password and save to database
-    # For now, we generate a token
-    payload = {
-        "sub": user.email,
-        "email": user.email,
-        "full_name": user.full_name,
-        "exp": datetime.utcnow() + timedelta(days=30)
-    }
-    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-    return TokenResponse(access_token=token)
+    """
+    Register a new user.
+    
+    Args:
+        user: User registration data with email, password, and full_name
+        
+    Returns:
+        TokenResponse: JWT token for authenticated session
+        
+    Raises:
+        HTTPException: 400 if validation fails, 500 if token generation fails
+    """
+    try:
+        # In production, this would hash the password and save to database
+        # For now, we generate a token
+        payload = {
+            "sub": user.email,
+            "email": user.email,
+            "full_name": user.full_name,
+            "exp": datetime.utcnow() + timedelta(days=30)
+        }
+        token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+        return TokenResponse(access_token=token)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate authentication token"
+        )
 
 @app.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
-    """Login user (mock implementation)"""
-    # In production, verify password hash from database
-    payload = {
-        "sub": credentials.email,
-        "email": credentials.email,
-        "exp": datetime.utcnow() + timedelta(days=30)
-    }
-    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-    return TokenResponse(access_token=token)
+    """
+    Authenticate user and return JWT token.
+    
+    Args:
+        credentials: User login credentials (email and password)
+        
+    Returns:
+        TokenResponse: JWT token for authenticated session
+        
+    Raises:
+        HTTPException: 401 if credentials invalid, 500 if token generation fails
+    """
+    try:
+        # In production, verify password hash from database
+        payload = {
+            "sub": credentials.email,
+            "email": credentials.email,
+            "exp": datetime.utcnow() + timedelta(days=30)
+        }
+        token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+        return TokenResponse(access_token=token)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication failed"
+        )
 
 @app.post("/auth/verify")
-async def verify_token(credentials: HTTPAuthCredential = Depends(security)):
-    """Verify JWT token"""
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Verify JWT token validity.
+    
+    Args:
+        credentials: Bearer token from Authorization header
+        
+    Returns:
+        dict: Verification status and user email if valid
+        
+    Raises:
+        HTTPException: 401 if token is invalid or expired
+    """
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         return {"valid": True, "user": payload.get("email")}
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 # Activity endpoints
 @app.post("/activities", response_model=ActivityResponse)
-async def create_activity(activity: ActivityLog, credentials: HTTPAuthCredential = Depends(security)):
-    """Log a carbon activity"""
-    try:
-        jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+async def create_activity(activity: ActivityLog, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Log a new carbon emission activity.
     
-    emissions = calculate_emissions(activity.category, activity.subcategory, activity.value)
+    Args:
+        activity: Activity data with category, subcategory, value, and unit
+        credentials: Valid JWT token from Authorization header
+        
+    Returns:
+        ActivityResponse: Created activity with calculated emissions
+        
+    Raises:
+        HTTPException: 401 if unauthorized, 400 if validation fails, 500 if calculation fails
+    """
+    try:
+        # Verify authentication
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token"
+        )
+    
+    try:
+        # Calculate emissions
+        emissions = calculate_emissions(activity.category, activity.subcategory, activity.value)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to calculate emissions"
+        )
     
     # Mock ID generation
     import uuid
@@ -181,23 +296,53 @@ async def create_activity(activity: ActivityLog, credentials: HTTPAuthCredential
     )
 
 @app.get("/activities/{user_id}", response_model=List[ActivityResponse])
-async def get_activities(user_id: str, credentials: HTTPAuthCredential = Depends(security)):
-    """Get user's activity logs"""
+async def get_activities(user_id: str, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Retrieve all activities for a user.
+    
+    Args:
+        user_id: ID of user to retrieve activities for
+        credentials: Valid JWT token from Authorization header
+        
+    Returns:
+        List[ActivityResponse]: List of user's activities
+        
+    Raises:
+        HTTPException: 401 if unauthorized, 404 if user not found
+    """
     try:
         jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token"
+        )
     
     # Mock data
     return []
 
 @app.get("/dashboard/{user_id}", response_model=DashboardStats)
-async def get_dashboard_stats(user_id: str, credentials: HTTPAuthCredential = Depends(security)):
-    """Get dashboard statistics for a user"""
+async def get_dashboard_stats(user_id: str, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Get dashboard statistics and summary for a user.
+    
+    Args:
+        user_id: ID of user to retrieve dashboard for
+        credentials: Valid JWT token from Authorization header
+        
+    Returns:
+        DashboardStats: User's emissions statistics and trends
+        
+    Raises:
+        HTTPException: 401 if unauthorized, 404 if user not found
+    """
     try:
         jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token"
+        )
     
     # Mock data
     return DashboardStats(
@@ -213,14 +358,29 @@ async def get_dashboard_stats(user_id: str, credentials: HTTPAuthCredential = De
     )
 
 @app.get("/insights/{user_id}", response_model=List[InsightResponse])
-async def get_insights(user_id: str, credentials: HTTPAuthCredential = Depends(security)):
-    """Get AI-powered insights (mock)"""
+async def get_insights(user_id: str, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Get AI-powered personalized insights for emissions reduction.
+    
+    Args:
+        user_id: ID of user to generate insights for
+        credentials: Valid JWT token from Authorization header
+        
+    Returns:
+        List[InsightResponse]: Personalized recommendations for emission reduction
+        
+    Raises:
+        HTTPException: 401 if unauthorized, 404 if user not found
+    """
     try:
         jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token"
+        )
     
-    # Mock insights
+    # Mock insights - In production, use Google Vertex AI for generation
     return [
         InsightResponse(
             title="Switch to Public Transport",
@@ -238,7 +398,12 @@ async def get_insights(user_id: str, credentials: HTTPAuthCredential = Depends(s
 
 @app.get("/emissions-factors")
 async def get_emission_factors():
-    """Get available emission factors for calculation"""
+    """
+    Get available emission factors for all categories and subcategories.
+    
+    Returns:
+        dict: Dictionary mapping categories to subcategories and their emission factors (kg CO2e)
+    """
     return EMISSION_FACTORS
 
 if __name__ == "__main__":

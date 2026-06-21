@@ -92,8 +92,9 @@ export default function ActivityLogger() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Category</label>
+            <label htmlFor="category-select" className="block text-sm font-medium text-foreground mb-2">Category <span className="text-red-500" aria-label="required">*</span></label>
             <select
+              id="category-select"
               value={formData.category}
               onChange={(e) =>
                 setFormData({
@@ -103,6 +104,7 @@ export default function ActivityLogger() {
                 })
               }
               className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-required="true"
             >
               {Object.keys(categories).map((cat) => (
                 <option key={cat} value={cat}>
@@ -113,8 +115,9 @@ export default function ActivityLogger() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Type</label>
+            <label htmlFor="subcategory-select" className="block text-sm font-medium text-foreground mb-2">Type <span className="text-red-500" aria-label="required">*</span></label>
             <select
+              id="subcategory-select"
               value={formData.subcategory}
               onChange={(e) =>
                 setFormData({
@@ -123,6 +126,7 @@ export default function ActivityLogger() {
                 })
               }
               className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-required="true"
             >
               {(categories[formData.category as keyof typeof categories] || []).map((sub) => (
                 <option key={sub} value={sub}>
@@ -133,19 +137,23 @@ export default function ActivityLogger() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Value</label>
+            <label htmlFor="value-input" className="block text-sm font-medium text-foreground mb-2">Value <span className="text-red-500" aria-label="required">*</span></label>
             <input
+              id="value-input"
               type="number"
               placeholder="25"
               value={formData.value}
               onChange={(e) => setFormData({ ...formData, value: e.target.value })}
               className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-required="true"
+              aria-describedby="value-error"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Unit</label>
+            <label htmlFor="unit-input" className="block text-sm font-medium text-foreground mb-2">Unit</label>
             <input
+              id="unit-input"
               type="text"
               placeholder="km"
               value={formData.unit}
@@ -157,18 +165,21 @@ export default function ActivityLogger() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Date</label>
+            <label htmlFor="date-input" className="block text-sm font-medium text-foreground mb-2">Date <span className="text-red-500" aria-label="required">*</span></label>
             <input
+              id="date-input"
               type="date"
               value={formData.date}
               onChange={(e) => setFormData({ ...formData, date: e.target.value })}
               className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-required="true"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Notes (optional)</label>
+            <label htmlFor="notes-input" className="block text-sm font-medium text-foreground mb-2">Notes (optional)</label>
             <input
+              id="notes-input"
               type="text"
               placeholder="Add notes..."
               value={formData.notes}
@@ -209,7 +220,8 @@ export default function ActivityLogger() {
                   </div>
                   <button
                     onClick={() => handleDeleteActivity(activity.id)}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
+                    className="text-muted-foreground hover:text-destructive transition-colors focus:outline-none focus:ring-2 focus:ring-destructive rounded px-1"
+                    aria-label={`Delete activity: ${activity.subcategory.replace(/_/g, ' ')}`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

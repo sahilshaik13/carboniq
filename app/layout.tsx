@@ -51,7 +51,16 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark bg-background`}>
       <body className="font-sans antialiased bg-background text-foreground">
         <AuthProvider>
-          {children}
+          {/* Skip to content link for accessibility */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-0 focus:left-0 focus:z-50 focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2"
+          >
+            Skip to main content
+          </a>
+          <main id="main-content">
+            {children}
+          </main>
           <Toaster position="top-right" />
         </AuthProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
