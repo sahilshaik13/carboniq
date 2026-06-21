@@ -9,11 +9,16 @@ from datetime import datetime, timedelta
 
 
 class AnalyticsService:
-    """Service for analyzing emissions data and generating benchmarks"""
+    """Service for analyzing emissions data and generating benchmarks.
+    
+    Provides regional benchmarks, user percentiles, category trends, and
+    achievement statistics. Integrates with BigQuery for Phase 3 analytics.
+    """
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize analytics service with optional BigQuery connection."""
         # In Phase 3, initialize BigQuery client
-        self.initialized = False
+        self.initialized: bool = False
         if os.getenv("GOOGLE_PROJECT_ID"):
             try:
                 # from google.cloud import bigquery
@@ -23,7 +28,15 @@ class AnalyticsService:
                 pass
 
     async def get_regional_benchmarks(self, region: str) -> Dict[str, Any]:
-        """Get emissions benchmarks for a region"""
+        """Get emissions benchmarks for a specific region.
+        
+        Args:
+            region: Region name (e.g., 'Europe', 'North America', 'Asia')
+            
+        Returns:
+            Dictionary containing average, median, and percentile emissions
+            data along with top emission categories for the region.
+        """
         if not self.initialized:
             return self._mock_regional_benchmarks(region)
 
@@ -34,7 +47,15 @@ class AnalyticsService:
         return self._mock_regional_benchmarks(region)
 
     async def get_user_percentile(self, user_id: str, region: str) -> Dict[str, Any]:
-        """Calculate user's emissions percentile in their region"""
+        """Calculate user's emissions percentile in their region.
+        
+        Args:
+            user_id: ID of user to calculate percentile for
+            region: Region to compare against
+            
+        Returns:
+            Dictionary with percentile ranking, status, and comparison metrics.
+        """
         if not self.initialized:
             return self._mock_user_percentile()
 
@@ -45,7 +66,15 @@ class AnalyticsService:
         return self._mock_user_percentile()
 
     async def get_category_trends(self, days: int = 90) -> Dict[str, Any]:
-        """Get trends across all categories"""
+        """Get emissions trends across all categories over specified period.
+        
+        Args:
+            days: Number of days to analyze (default 90)
+            
+        Returns:
+            Dictionary with trend direction, average weekly emissions,
+            and improvement percentages for each category.
+        """
         return {
             "period_days": days,
             "transport": {
@@ -66,7 +95,12 @@ class AnalyticsService:
         }
 
     async def get_achievement_stats(self) -> Dict[str, Any]:
-        """Get global achievement statistics"""
+        """Get global achievement statistics across all users.
+        
+        Returns:
+            Dictionary with total users, tracked emissions, saved emissions,
+            active carbon credits, completed trades, and top contributing regions.
+        """
         return {
             "total_users": 50000,
             "total_emissions_tracked_tonnes": 2500,
@@ -77,7 +111,14 @@ class AnalyticsService:
         }
 
     def _mock_regional_benchmarks(self, region: str) -> Dict[str, Any]:
-        """Mock regional benchmark data"""
+        """Mock regional benchmark data for development.
+        
+        Args:
+            region: Region name to get benchmarks for
+            
+        Returns:
+            Dictionary with regional emission statistics and analysis.
+        """
         benchmarks = {
             "Europe": {
                 "avg_annual_emissions": 2100,
@@ -107,7 +148,11 @@ class AnalyticsService:
         return benchmarks.get(region, benchmarks["Europe"])
 
     def _mock_user_percentile(self) -> Dict[str, Any]:
-        """Mock user percentile calculation"""
+        """Mock user percentile calculation for development.
+        
+        Returns:
+            Dictionary with user's percentile, emission comparison, and rank.
+        """
         return {
             "user_annual_emissions": 1205,
             "regional_average": 2100,
@@ -124,7 +169,15 @@ analytics_service = AnalyticsService()
 
 # Helper functions
 async def get_comprehensive_analytics(user_id: str, region: str) -> Dict[str, Any]:
-    """Get comprehensive analytics for a user"""
+    """Get comprehensive analytics including benchmarks and trends for a user.
+    
+    Args:
+        user_id: ID of user to analyze
+        region: Region to compare against
+        
+    Returns:
+        Dictionary with regional benchmarks, user percentile, trends, and global stats.
+    """
     return {
         "regional_benchmarks": await analytics_service.get_regional_benchmarks(region),
         "user_percentile": await analytics_service.get_user_percentile(user_id, region),
@@ -135,7 +188,15 @@ async def get_comprehensive_analytics(user_id: str, region: str) -> Dict[str, An
 
 
 def calculate_comparable_metrics(user_emissions: float, benchmark: Dict) -> Dict[str, Any]:
-    """Calculate how user compares to benchmark"""
+    """Calculate how user's emissions compare to regional benchmarks.
+    
+    Args:
+        user_emissions: User's annual emissions in kg CO2e
+        benchmark: Regional benchmark dictionary with average and median
+        
+    Returns:
+        Dictionary with comparison metrics, reduction percentage, and status.
+    """
     avg = benchmark.get("avg_annual_emissions", 2000)
     median = benchmark.get("median_annual_emissions", 1900)
 

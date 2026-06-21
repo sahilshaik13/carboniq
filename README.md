@@ -1,5 +1,7 @@
 # CarbonIQ - Professional Carbon Footprint Tracking Platform
 
+**Live Demo:** https://carboniq-web-app.vercel.app/
+
 > Track your carbon emissions, get AI-powered insights, and make data-driven decisions for a sustainable future.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
@@ -159,7 +161,21 @@ carboniq/
 
 ---
 
-## 🎯 Use Cases
+## 🎯 Problem Statement
+
+CarbonIQ helps individuals understand, track, and reduce their carbon footprint through simple actions and personalized insights. We address the core challenge: most people don't know their actual environmental impact or how to meaningfully reduce it.
+
+**Challenge:** "Help individuals understand, track, and reduce their carbon footprint through simple actions and personalized insights"
+
+**Feature Mapping:**
+- **Activity logging + OCR bill upload** → Simple actions: Users easily log emissions from daily activities or upload utility bills for automatic processing
+- **Vertex AI personalized insight generation** → Personalized insights: AI analyzes individual behavior patterns to generate custom reduction recommendations
+- **Dashboard with trend charts + regional benchmarking** → Understand and track footprint: Real-time visualization of emissions trends with community comparisons for context
+- **Carbon credits ledger + streak tracking** → Sustained reduction behavior: Gamified system with verifiable credits and achievement tracking motivates long-term behavior change
+
+---
+
+## 💼 Use Cases
 
 ### Individual Users
 - Track personal carbon footprint
@@ -216,25 +232,45 @@ All calculations use scientific, real-world data:
 
 ## 🚢 Deployment
 
-### Frontend (Next.js)
+### Frontend (Next.js on Vercel)
 ```bash
-# Deploy to Vercel (recommended)
+# Deploy directly to Vercel
 vercel deploy
 
-# Or build for any static host
+# Or create a production build
 pnpm build
+pnpm start
 ```
 
 ### Backend (FastAPI)
 ```bash
-# Deploy to AWS, Railway, Heroku, etc.
-# See CARBONIQ_GUIDE.md for detailed instructions
+# Local development
+cd api
+python -m uvicorn main:app --reload
+
+# Production with Gunicorn
+pip install gunicorn
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app
 ```
 
-### Database
+### Database Setup
 ```bash
-# Use PostgreSQL or Supabase
-# Configure connection string in .env
+# Option 1: Supabase (recommended)
+# 1. Create Supabase project
+# 2. Set SUPABASE_URL and SUPABASE_KEY in .env
+# 3. Run migrations
+
+# Option 2: Local PostgreSQL
+# docker run -e POSTGRES_PASSWORD=password -p 5432:5432 postgres
+```
+
+### Environment Variables Required
+```bash
+FRONTEND_URL=https://carboniq-web-app.vercel.app
+JWT_SECRET=<generate-with-openssl-rand-base64-32>
+SUPABASE_URL=<your-supabase-url>
+SUPABASE_KEY=<your-supabase-key>
+GOOGLE_PROJECT_ID=<optional-for-phase-2>
 ```
 
 ---
@@ -262,6 +298,25 @@ pnpm build
 - **Next.js** - Turbopack for fast builds
 - **Tailwind CSS** - Minimal CSS output
 - **Lazy Loading** - Components load on demand
+
+---
+
+## 📦 Tech Stack
+
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| **Frontend** | Next.js 16, React 19, TypeScript | Modern web application with server components |
+| **Styling** | Tailwind CSS 4 | Responsive design with dark theme |
+| **UI Components** | shadcn/ui, Recharts | Accessible components and data visualization |
+| **State Management** | SWR | Efficient client-side data fetching and caching |
+| **Backend API** | FastAPI, Python | Fast, type-safe REST API |
+| **Database** | PostgreSQL / Supabase | Persistent data storage with RLS support |
+| **Authentication** | JWT + Better Auth ready | Secure token-based authentication |
+| **AI Integration** | Google Vertex AI | Personalized insight generation (Phase 2) |
+| **Document Processing** | Google Document AI | OCR for utility bills and receipts (Phase 2) |
+| **Analytics** | Google BigQuery | Regional benchmarking and trend analysis (Phase 3) |
+| **Verification** | Blockchain-ready | Carbon credit ledger with hash chain (Phase 3) |
+| **Deployment** | Vercel (frontend), Cloud Run | Production-ready hosting |
 
 ---
 
@@ -293,6 +348,66 @@ pnpm build
 - **[CARBONIQ_GUIDE.md](./CARBONIQ_GUIDE.md)** - Complete feature documentation
 - **[BUILD_SUMMARY.md](./BUILD_SUMMARY.md)** - Architecture and technical details
 - **API Docs** - Available at `/api/docs` when backend running
+
+---
+
+## 🧪 Testing
+
+CarbonIQ includes comprehensive test suites for both frontend and backend:
+
+### Backend Testing (pytest)
+```bash
+# Run all backend tests
+pnpm run test:backend
+
+# Or manually:
+cd api && python -m pytest tests/ -v
+```
+
+**Test Coverage:**
+- `test_emission_calculator.py`: Validates emission calculations across all categories
+- `test_ledger_service.py`: Verifies hash chain integrity and credit transactions
+
+### Frontend Testing (vitest)
+```bash
+# Run all frontend tests
+pnpm run test
+
+# Run tests in watch mode
+pnpm run test:watch
+```
+
+**Test Coverage:**
+- `ActivityForm.test.tsx`: Form validation and field requirements
+- `FootprintChart.test.tsx`: Chart rendering and data display
+
+---
+
+## 🔒 Security & Best Practices
+
+### Security Implementation
+- **CORS**: Restricted to deployed frontend origin (configurable via `FRONTEND_URL`)
+- **Input Validation**: All API inputs validated with Pydantic models and field constraints
+- **Authentication**: JWT-based with Bearer tokens and expiration
+- **Authorization**: Row-level security (RLS) ready for Supabase integration
+- **Password Requirements**: Minimum 8 characters with at least one digit
+- **Error Handling**: Structured error responses (400, 401, 404, 500)
+- **Type Safety**: Full type hints on Python backend for runtime validation
+
+### Accessibility Compliance (WCAG 2.1 AA)
+- Skip-to-content navigation link for keyboard users
+- All form inputs have associated labels with required indicators
+- Icon-only buttons include `aria-label` attributes
+- Charts include text equivalents for screen reader users
+- Focus outlines visible on all interactive elements
+- Proper heading hierarchy and semantic HTML
+- Color contrast meets WCAG AA standards
+
+### Data Protection
+- No hardcoded secrets (all from environment variables)
+- JWT tokens with configurable expiration
+- Optional: Supabase RLS policies for row-level access control
+- Optional: Better Auth integration for enhanced security
 
 ---
 
